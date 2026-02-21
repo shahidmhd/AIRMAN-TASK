@@ -8,7 +8,7 @@ on:
 
 jobs:
   backend:
-    name: Backend - Lint, Test, Build
+    name: Backend CI
     runs-on: ubuntu-latest
 
     services:
@@ -35,27 +35,44 @@ jobs:
           cache: 'npm'
           cache-dependency-path: apps/backend/package-lock.json
 
-      - name: Install backend deps
+      - name: Install dependencies
         run: cd apps/backend && npm ci
 
       - name: Lint
-        run: cd apps/backend && npm run lint || true
+        run: cd apps/backend && npm run lint
+
+      - name: Generate Prisma client
+        run: cd apps/backend && npx prisma generate
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/airman_test
 
       - name: Run migrations
         run: cd apps/backend && npx prisma migrate deploy
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/airman_test
 
-      - name: Run tests
-        run: cd apps/backend && npm test
+      - name: Run unit tests
+        run: cd apps/backend && npm run test:unit
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/airman_test
           JWT_ACCESS_SECRET: test-access-secret
           JWT_REFRESH_SECRET: test-refresh-secret
           NODE_ENV: test
+          PORT: 4000
+          FRONTEND_URL: http://localhost:3000
+
+      - name: Run integration tests
+        run: cd apps/backend && npm run test:integration
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/airman_test
+          JWT_ACCESS_SECRET: test-access-secret
+          JWT_REFRESH_SECRET: test-refresh-secret
+          NODE_ENV: test
+          PORT: 4000
+          FRONTEND_URL: http://localhost:3000
 
   frontend:
-    name: Frontend - Lint, Build
+    name: Frontend CI
     runs-on: ubuntu-latest
 
     steps:
@@ -67,13 +84,13 @@ jobs:
           cache: 'npm'
           cache-dependency-path: apps/frontend/package-lock.json
 
-      - name: Install frontend deps
+      - name: Install dependencies
         run: cd apps/frontend && npm ci
 
       - name: Lint
-        run: cd apps/frontend && npm run lint || true
+        run: cd apps/frontend && npm run lint
 
       - name: Build
         run: cd apps/frontend && npm run build
         env:
-          NEXT_PUBLIC_API_URL: http://localhost:5000/api
+          NEXT_PUBLIC_API_URL: http://localhost:4000/api
