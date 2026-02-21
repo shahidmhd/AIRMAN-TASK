@@ -8,10 +8,12 @@ const { errorHandler, notFound } = require('./middleware/error.middleware');
 
 const authRoutes = require('./modules/auth/auth.routes');
 const usersRoutes = require('./modules/users/users.routes');
+const coursesRoutes = require('./modules/courses/courses.routes');
+const quizzesRoutes = require('./modules/quizzes/quizzes.routes');
+const schedulingRoutes = require('./modules/scheduling/scheduling.routes');
 
 const app = express();
 
-// ── 1. CORS FIRST ────────────────────────────────────────────────
 app.use(cors({
   origin: ['http://localhost:3000', 'http://127.0.0.1:3000'],
   credentials: true,
@@ -19,18 +21,15 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 
-// ── 2. Body parsing ──────────────────────────────────────────────
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// ── 3. Rate limiting ─────────────────────────────────────────────
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 100,
   message: { error: 'Too many requests' },
 });
 
-// ── 4. Swagger ───────────────────────────────────────────────────
 app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
   customSiteTitle: 'AIRMAN API Docs',
   swaggerOptions: { persistAuthorization: true },
@@ -41,15 +40,15 @@ app.get('/api/docs.json', (req, res) => {
   res.send(swaggerSpec);
 });
 
-// ── 5. Routes ────────────────────────────────────────────────────
+// Routes
 app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/users', usersRoutes);
+app.use('/api/courses', coursesRoutes);
+app.use('/api/quizzes', quizzesRoutes);
+app.use('/api/scheduling', schedulingRoutes);
 
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date() });
-});
+app.get('/health', (req, res) => res.json({ status: 'ok', timestamp: new Date() }));
 
-// ── 6. Error handling ────────────────────────────────────────────
 app.use(notFound);
 app.use(errorHandler);
 
