@@ -24,6 +24,7 @@ const approveUser = async (req, res, next) => {
 
 const createInstructor = async (req, res, next) => {
   try {
+    console.log('Request body:', req.body); 
     const schema = z.object({
       email: z.string().email(),
       password: z.string().min(8),
