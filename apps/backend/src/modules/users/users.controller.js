@@ -24,18 +24,68 @@ const approveUser = async (req, res, next) => {
 
 const createInstructor = async (req, res, next) => {
   try {
-    console.log('Request body:', req.body); 
+    // Log incoming body for debug
+    console.log('Creating instructor, body:', req.body);
+
     const schema = z.object({
-      email: z.string().email(),
-      password: z.string().min(8),
-      name: z.string().min(2),
+      email: z.string().email('Invalid email'),
+      password: z.string().min(8, 'Password must be at least 8 characters'),
+      name: z.string().min(2, 'Name must be at least 2 characters'),
     });
-    const data = schema.parse(req.body);
-    const instructor = await usersService.createInstructor(data);
-    res.status(201).json({ message: 'Instructor created', instructor });
+
+    const result = schema.safeParse(req.body);
+
+    if (!result.success) {
+      return res.status(400).json({
+        error: 'Validation Error',
+        details: result.error.errors.map((e) => ({
+          field: e.path.join('.'),
+          message: e.message,
+        })),
+      });
+    }
+
+    const instructor = await usersService.createInstructor(result.data);
+    res.status(201).json({ message: 'Instructor created successfully', instructor });
   } catch (error) {
     next(error);
   }
 };
 
-module.exports = { getUsers, approveUser, createInstructor };
+const getMe = async (req, res) => {
+  res.json({ user: req.user });
+};
+
+const deleteUser = async (req, res, next) => {
+  try {
+    await usersService.deleteUser(req.params.id);
+    res.json({ message: 'User deleted successfully' });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const updateUserRole = async (req, res, next) => {
+  try {
+    const schema = z.object({
+      role: z.enum(['STUDENT', 'INSTRUCTOR', 'ADMIN']),
+    });
+    const result = schema.safeParse(req.body);
+    if (!result.success) {
+      return res.status(400).json({ error: 'Invalid role' });
+    }
+    const user = await usersService.updateRole(req.params.id, result.data.role);
+    res.json({ message: 'Role updated', user });
+  } catch (error) {
+    next(error);
+  }
+};
+
+module.exports = {
+  getUsers,
+  approveUser,
+  createInstructor,
+  getMe,
+  deleteUser,
+  updateUserRole,
+};

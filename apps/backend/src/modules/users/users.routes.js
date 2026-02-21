@@ -2,9 +2,7 @@ const express = require('express');
 const router = express.Router();
 const usersController = require('./users.controller');
 const { authenticate } = require('../../middleware/auth.middleware');
-const { requireAdmin } = require('../../middleware/rbac.middleware');
-
-router.use(authenticate, requireAdmin);
+const { requireAdmin, requireInstructor } = require('../../middleware/rbac.middleware');
 
 /**
  * @swagger
@@ -27,25 +25,16 @@ router.use(authenticate, requireAdmin);
  *     responses:
  *       200:
  *         description: List of users
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 users:
- *                   type: array
- *                   items: { $ref: '#/components/schemas/User' }
- *                 pagination: { $ref: '#/components/schemas/Pagination' }
  *       403:
- *         description: Forbidden - Admin only
+ *         description: Forbidden
  */
-router.get('/', usersController.getUsers);
+router.get('/', authenticate, requireAdmin, usersController.getUsers);
 
 /**
  * @swagger
  * /users/instructors:
  *   post:
- *     summary: Create an instructor account (Admin only)
+ *     summary: Create instructor (Admin only)
  *     tags: [Users]
  *     security:
  *       - bearerAuth: []
@@ -57,24 +46,22 @@ router.get('/', usersController.getUsers);
  *             type: object
  *             required: [email, password, name]
  *             properties:
- *               email:    { type: string, format: email }
+ *               email: { type: string }
  *               password: { type: string, minLength: 8 }
- *               name:     { type: string, minLength: 2 }
+ *               name: { type: string }
  *     responses:
  *       201:
  *         description: Instructor created
- *       409:
- *         description: Email already in use
  *       403:
- *         description: Forbidden - Admin only
+ *         description: Forbidden
  */
-router.post('/instructors', usersController.createInstructor);
+router.post('/instructors', authenticate, requireAdmin, usersController.createInstructor);
 
 /**
  * @swagger
  * /users/{id}/approve:
  *   patch:
- *     summary: Approve a user account (Admin only)
+ *     summary: Approve user (Admin only)
  *     tags: [Users]
  *     security:
  *       - bearerAuth: []
@@ -82,23 +69,64 @@ router.post('/instructors', usersController.createInstructor);
  *       - in: path
  *         name: id
  *         required: true
- *         schema: { type: string, format: uuid }
- *         description: User ID to approve
+ *         schema: { type: string }
  *     responses:
  *       200:
  *         description: User approved
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message: { type: string }
- *                 user:    { $ref: '#/components/schemas/User' }
- *       404:
- *         description: User not found
  *       403:
- *         description: Forbidden - Admin only
+ *         description: Forbidden
  */
-router.patch('/:id/approve', usersController.approveUser);
+router.patch('/:id/approve', authenticate, requireAdmin, usersController.approveUser);
+
+/**
+ * @swagger
+ * /users/{id}/role:
+ *   patch:
+ *     summary: Update user role (Admin only)
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [role]
+ *             properties:
+ *               role: { type: string, enum: [STUDENT, INSTRUCTOR, ADMIN] }
+ *     responses:
+ *       200:
+ *         description: Role updated
+ *       403:
+ *         description: Forbidden
+ */
+router.patch('/:id/role', authenticate, requireAdmin, usersController.updateUserRole);
+
+/**
+ * @swagger
+ * /users/{id}:
+ *   delete:
+ *     summary: Delete user (Admin only)
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: User deleted
+ *       403:
+ *         description: Forbidden
+ */
+router.delete('/:id', authenticate, requireAdmin, usersController.deleteUser);
 
 module.exports = router;
