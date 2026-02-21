@@ -5,27 +5,28 @@ import { usePathname } from 'next/navigation';
 import { useAuthStore } from '@/store/auth.store';
 import { cn } from '@/lib/utils';
 import {
-  LayoutDashboard, Users, BookOpen, Calendar,
-  LogOut, GraduationCap, Settings
-} from 'lucide-react';
+    LayoutDashboard, Users, BookOpen, Calendar,
+    LogOut, GraduationCap, CalendarDays
+  } from 'lucide-react';
 
 const navItems = {
-  ADMIN: [
-    { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
-    { href: '/admin/users', label: 'Users', icon: Users },
-    { href: '/admin/bookings', label: 'Bookings', icon: Calendar },
-  ],
-  INSTRUCTOR: [
-    { href: '/instructor', label: 'Dashboard', icon: LayoutDashboard },
-    { href: '/instructor/courses', label: 'My Courses', icon: BookOpen },
-    { href: '/instructor/schedule', label: 'Schedule', icon: Calendar },
-  ],
-  STUDENT: [
-    { href: '/student', label: 'Dashboard', icon: LayoutDashboard },
-    { href: '/student/courses', label: 'Courses', icon: BookOpen },
-    { href: '/student/bookings', label: 'Bookings', icon: Calendar },
-  ],
-};
+    ADMIN: [
+      { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
+      { href: '/admin/users', label: 'Users', icon: Users },
+      { href: '/admin/bookings', label: 'Bookings', icon: Calendar },
+      { href: '/admin/schedule', label: 'Weekly Schedule', icon: CalendarDays },
+    ],
+    INSTRUCTOR: [
+      { href: '/instructor', label: 'Dashboard', icon: LayoutDashboard },
+      { href: '/instructor/courses', label: 'My Courses', icon: BookOpen },
+      { href: '/instructor/schedule', label: 'Schedule', icon: Calendar },
+    ],
+    STUDENT: [
+      { href: '/student', label: 'Dashboard', icon: LayoutDashboard },
+      { href: '/student/courses', label: 'Courses', icon: BookOpen },
+      { href: '/student/bookings', label: 'Bookings', icon: Calendar },
+    ],
+  };
 
 export default function Sidebar() {
   const pathname = usePathname();
