@@ -24,16 +24,16 @@ services:
     container_name: airman_backend
     restart: unless-stopped
     ports:
-      - '5000:5000'
+      - '4000:4000'
     environment:
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/airman_dev
       JWT_ACCESS_SECRET: dev-access-secret-change-in-prod
       JWT_REFRESH_SECRET: dev-refresh-secret-change-in-prod
       JWT_ACCESS_EXPIRES_IN: 15m
       JWT_REFRESH_EXPIRES_IN: 7d
-      NODE_ENV: development
+      NODE_ENV: production
       FRONTEND_URL: http://localhost:3000
-      PORT: 5000
+      PORT: 4000
     depends_on:
       postgres:
         condition: service_healthy
@@ -51,7 +51,7 @@ services:
     ports:
       - '3000:3000'
     environment:
-      NEXT_PUBLIC_API_URL: http://localhost:5000/api
+      NEXT_PUBLIC_API_URL: http://localhost:4000/api
     depends_on:
       - backend
 
