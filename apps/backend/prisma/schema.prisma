@@ -1,14 +1,162 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
-  provider = "prisma-client"
-  output   = "../generated/prisma"
+  provider = "prisma-client-js"
 }
 
 datasource db {
   provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  STUDENT
+  INSTRUCTOR
+  ADMIN
+}
+
+enum BookingStatus {
+  REQUESTED
+  APPROVED
+  COMPLETED
+  CANCELLED
+}
+
+enum LessonType {
+  TEXT
+  QUIZ
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  password     String
+  name         String
+  role         Role     @default(STUDENT)
+  isApproved   Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  refreshTokens RefreshToken[]
+  quizAttempts  QuizAttempt[]
+  bookingsAsStudent    Booking[] @relation("StudentBookings")
+  bookingsAsInstructor Booking[] @relation("InstructorBookings")
+  availabilities       Availability[]
+
+  @@map("users")
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@map("refresh_tokens")
+}
+
+model Course {
+  id          String   @id @default(uuid())
+  title       String
+  description String?
+  createdById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  modules Module[]
+
+  @@map("courses")
+}
+
+model Module {
+  id        String   @id @default(uuid())
+  title     String
+  order     Int      @default(0)
+  courseId  String
+  course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  lessons Lesson[]
+
+  @@map("modules")
+}
+
+model Lesson {
+  id       String     @id @default(uuid())
+  title    String
+  type     LessonType @default(TEXT)
+  content  String?
+  order    Int        @default(0)
+  moduleId String
+  module   Module     @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+
+  quiz Quiz?
+
+  @@map("lessons")
+}
+
+model Quiz {
+  id       String @id @default(uuid())
+  lessonId String @unique
+  lesson   Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  questions Question[]
+  attempts  QuizAttempt[]
+
+  @@map("quizzes")
+}
+
+model Question {
+  id      String   @id @default(uuid())
+  text    String
+  options Json
+  answer  String
+  quizId  String
+  quiz    Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
+
+  @@map("questions")
+}
+
+model QuizAttempt {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  quizId    String
+  quiz      Quiz     @relation(fields: [quizId], references: [id])
+  score     Int
+  total     Int
+  answers   Json
+  results   Json
+  createdAt DateTime @default(now())
+
+  @@map("quiz_attempts")
+}
+
+model Availability {
+  id           String   @id @default(uuid())
+  instructorId String
+  instructor   User     @relation(fields: [instructorId], references: [id])
+  date         DateTime @db.Date
+  startTime    String
+  endTime      String
+  createdAt    DateTime @default(now())
+
+  @@map("availabilities")
+}
+
+model Booking {
+  id           String        @id @default(uuid())
+  studentId    String
+  student      User          @relation("StudentBookings", fields: [studentId], references: [id])
+  instructorId String
+  instructor   User          @relation("InstructorBookings", fields: [instructorId], references: [id])
+  date         DateTime      @db.Date
+  startTime    String
+  endTime      String
+  status       BookingStatus @default(REQUESTED)
+  notes        String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@map("bookings")
 }
