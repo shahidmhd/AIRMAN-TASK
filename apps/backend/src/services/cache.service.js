@@ -18,14 +18,14 @@ const set = async (key, value, ttl = DEFAULT_TTL) => {
 };
 
 const del = async (key) => {
-  try { await redis.del(key); } catch {}
+  try { await redis.del(key); } catch {/* ignore */}
 };
 
 const delPattern = async (pattern) => {
   try {
     const keys = await redis.keys(pattern);
     if (keys.length > 0) await redis.del(...keys);
-  } catch {}
+  } catch {/* ignore */}
 };
 
 const KEYS = {

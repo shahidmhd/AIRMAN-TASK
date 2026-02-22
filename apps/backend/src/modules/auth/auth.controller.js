@@ -46,7 +46,7 @@ const login = async (req, res, next) => {
         ipAddress:     req.ip,
         userAgent:     req.headers['user-agent'],
       });
-    } catch {}
+    } catch { /* ignore */ }
 
     res.json(result);
   } catch (error) { next(error); }
