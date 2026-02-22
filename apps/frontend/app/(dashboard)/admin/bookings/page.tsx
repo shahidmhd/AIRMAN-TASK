@@ -6,164 +6,138 @@ import { Card, CardHeader, CardBody } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import Badge from '@/components/ui/Badge';
 import Alert from '@/components/ui/Alert';
-import api from '@/lib/api';
-import { Calendar, Clock, RefreshCw, CheckCircle, XCircle } from 'lucide-react';
+import { RefreshCw } from 'lucide-react';
 
-const statusBadge: Record<string, any> = {
-  REQUESTED: 'yellow',
-  APPROVED: 'green',
-  COMPLETED: 'blue',
-  CANCELLED: 'red',
+const STATUS_BADGE: Record<string, 'yellow'|'blue'|'green'|'red'|'gray'> = {
+  REQUESTED: 'yellow', APPROVED: 'blue', ASSIGNED: 'blue',
+  COMPLETED: 'green',  CANCELLED: 'red',
 };
 
 export default function AdminBookingsPage() {
-  const [bookings, setBookings] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [alert, setAlert] = useState<any>(null);
-  const [statusFilter, setStatusFilter] = useState('');
+  const [bookings, setBookings]   = useState<any[]>([]);
+  const [loading, setLoading]     = useState(true);
+  const [statusFilter, setStatus] = useState('');
+  const [alert, setAlert]         = useState<{ type: 'success'|'error'; message: string } | null>(null);
+  const [stats, setStats]         = useState({ REQUESTED: 0, APPROVED: 0, COMPLETED: 0, CANCELLED: 0 });
+
+  const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : '';
 
   const fetchBookings = async () => {
     try {
       setLoading(true);
-      const params = statusFilter ? `?status=${statusFilter}` : '';
-      const res = await api.get(`/scheduling/bookings${params}`);
-      setBookings(res.data.bookings || []);
-    } catch {
-      setAlert({ type: 'error', message: 'Failed to load bookings' });
-    } finally {
-      setLoading(false);
-    }
+      const params = new URLSearchParams({ limit: '50' });
+      if (statusFilter) params.append('status', statusFilter);
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/scheduling/bookings?${params}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      const list = data.bookings || [];
+      setBookings(list);
+      setStats({
+        REQUESTED: list.filter((b: any) => b.status === 'REQUESTED').length,
+        APPROVED:  list.filter((b: any) => b.status === 'APPROVED').length,
+        COMPLETED: list.filter((b: any) => b.status === 'COMPLETED').length,
+        CANCELLED: list.filter((b: any) => b.status === 'CANCELLED').length,
+      });
+    } finally { setLoading(false); }
   };
 
   useEffect(() => { fetchBookings(); }, [statusFilter]);
 
   const updateStatus = async (id: string, status: string) => {
     try {
-      await api.patch(`/scheduling/bookings/${id}/status`, { status });
+      await fetch(`${process.env.NEXT_PUBLIC_API_URL}/scheduling/bookings/${id}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ status }),
+      });
       setAlert({ type: 'success', message: `Booking ${status.toLowerCase()}` });
       fetchBookings();
-    } catch (err: any) {
-      setAlert({ type: 'error', message: err.response?.data?.error || 'Failed' });
+    } catch {
+      setAlert({ type: 'error', message: 'Failed to update booking' });
     }
   };
 
-  const stats = {
-    requested: bookings.filter(b => b.status === 'REQUESTED').length,
-    approved: bookings.filter(b => b.status === 'APPROVED').length,
-    completed: bookings.filter(b => b.status === 'COMPLETED').length,
-    cancelled: bookings.filter(b => b.status === 'CANCELLED').length,
-  };
+  const statCards = [
+    { label: 'Requested', value: stats.REQUESTED, color: 'text-yellow-600 bg-yellow-50' },
+    { label: 'Approved',  value: stats.APPROVED,  color: 'text-blue-600 bg-blue-50' },
+    { label: 'Completed', value: stats.COMPLETED, color: 'text-green-600 bg-green-50' },
+    { label: 'Cancelled', value: stats.CANCELLED, color: 'text-red-600 bg-red-50' },
+  ];
 
   return (
     <DashboardLayout title="Booking Management">
       <div className="space-y-4">
         {alert && <Alert type={alert.type} message={alert.message} />}
 
-        {/* Stats */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          {[
-            { label: 'Requested', value: stats.requested, color: 'bg-yellow-50 text-yellow-700' },
-            { label: 'Approved', value: stats.approved, color: 'bg-green-50 text-green-700' },
-            { label: 'Completed', value: stats.completed, color: 'bg-blue-50 text-blue-700' },
-            { label: 'Cancelled', value: stats.cancelled, color: 'bg-red-50 text-red-700' },
-          ].map(({ label, value, color }) => (
-            <div key={label} className={`rounded-xl p-4 ${color}`}>
-              <p className="text-2xl font-bold">{value}</p>
-              <p className="text-sm mt-1">{label}</p>
-            </div>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {statCards.map(s => (
+            <Card key={s.label}>
+              <CardBody className="flex items-center gap-3">
+                <div className={`p-2 rounded-lg ${s.color}`}>
+                  <p className="text-xl font-bold">{s.value}</p>
+                </div>
+                <p className="text-sm text-gray-500">{s.label}</p>
+              </CardBody>
+            </Card>
           ))}
         </div>
 
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between gap-3">
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
+            <div className="flex items-center justify-between">
+              <select value={statusFilter} onChange={e => setStatus(e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
                 <option value="">All Statuses</option>
-                <option value="REQUESTED">Requested</option>
-                <option value="APPROVED">Approved</option>
-                <option value="COMPLETED">Completed</option>
-                <option value="CANCELLED">Cancelled</option>
+                {['REQUESTED','APPROVED','ASSIGNED','COMPLETED','CANCELLED'].map(s => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
               </select>
-              <Button variant="secondary" size="sm" onClick={fetchBookings}>
-                <RefreshCw className="w-4 h-4" />
+              <Button size="sm" variant="secondary" onClick={fetchBookings}>
+                <RefreshCw className="w-4 h-4 mr-1" /> Refresh
               </Button>
             </div>
           </CardHeader>
           <CardBody className="p-0">
-            {loading ? (
-              <div className="flex items-center justify-center py-16 text-gray-400">
-                <RefreshCw className="w-5 h-5 animate-spin mr-2" /> Loading...
-              </div>
-            ) : bookings.length === 0 ? (
-              <div className="text-center py-16 text-gray-400">No bookings found</div>
-            ) : (
-              <div className="divide-y divide-gray-100">
-                {bookings.map((b) => (
-                  <div key={b.id} className="p-6 hover:bg-gray-50">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <Calendar className="w-4 h-4 text-gray-400" />
-                          <span className="font-medium text-gray-900">
-                            {new Date(b.date).toLocaleDateString('en-US', {
-                              weekday: 'long', year: 'numeric',
-                              month: 'long', day: 'numeric',
-                            })}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Clock className="w-4 h-4 text-gray-400" />
-                          <span className="text-sm text-gray-600">
-                            {b.startTime} – {b.endTime}
-                          </span>
-                        </div>
-                        <p className="text-sm text-gray-600">
-                          Student: <span className="font-medium">{b.student?.name}</span>
-                          {' · '}
-                          Instructor: <span className="font-medium">{b.instructor?.name}</span>
-                        </p>
-                        {b.notes && (
-                          <p className="text-sm text-gray-500 italic">"{b.notes}"</p>
-                        )}
-                      </div>
-                      <div className="flex flex-col items-end gap-2">
-                        <Badge label={b.status} variant={statusBadge[b.status]} />
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-200 bg-gray-50">
+                    {['Student','Instructor','Date','Time','Status','Actions'].map(h => (
+                      <th key={h} className="text-left px-6 py-3 font-medium text-gray-600">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {loading ? (
+                    <tr><td colSpan={6} className="text-center py-12 text-gray-400">Loading...</td></tr>
+                  ) : bookings.length === 0 ? (
+                    <tr><td colSpan={6} className="text-center py-12 text-gray-400">No bookings found</td></tr>
+                  ) : bookings.map(b => (
+                    <tr key={b.id} className="hover:bg-gray-50 transition-colors">
+                      <td className="px-6 py-4 font-medium text-gray-900">{b.student?.name}</td>
+                      <td className="px-6 py-4 text-gray-600">{b.instructor?.name}</td>
+                      <td className="px-6 py-4 text-gray-600">{new Date(b.date).toLocaleDateString()}</td>
+                      <td className="px-6 py-4 text-gray-600">{b.startTime} – {b.endTime}</td>
+                      <td className="px-6 py-4">
+                        <Badge label={b.status} variant={STATUS_BADGE[b.status] || 'gray'} />
+                      </td>
+                      <td className="px-6 py-4 flex gap-2">
                         {b.status === 'REQUESTED' && (
-                          <div className="flex gap-2">
-                            <Button
-                              size="sm"
-                              onClick={() => updateStatus(b.id, 'APPROVED')}
-                            >
-                              <CheckCircle className="w-4 h-4 mr-1" /> Approve
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="danger"
-                              onClick={() => updateStatus(b.id, 'CANCELLED')}
-                            >
-                              <XCircle className="w-4 h-4 mr-1" /> Reject
-                            </Button>
-                          </div>
+                          <Button size="sm" onClick={() => updateStatus(b.id, 'APPROVED')}>Approve</Button>
                         )}
                         {b.status === 'APPROVED' && (
-                          <Button
-                            size="sm"
-                            variant="danger"
-                            onClick={() => updateStatus(b.id, 'CANCELLED')}
-                          >
-                            Cancel
-                          </Button>
+                          <Button size="sm" variant="secondary" onClick={() => updateStatus(b.id, 'ASSIGNED')}>Assign</Button>
                         )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+                        {!['COMPLETED','CANCELLED'].includes(b.status) && (
+                          <Button size="sm" variant="danger" onClick={() => updateStatus(b.id, 'CANCELLED')}>Cancel</Button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </CardBody>
         </Card>
       </div>

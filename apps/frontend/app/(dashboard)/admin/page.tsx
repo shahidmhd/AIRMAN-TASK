@@ -1,59 +1,42 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
-import { Card, CardBody } from '@/components/ui/Card';
-import api from '@/lib/api';
-import { Users, CheckCircle, Clock, BookOpen } from 'lucide-react';
+import { useAuthStore } from '@/store/auth.store';
+import Link from 'next/link';
+import { Users, Calendar, BookOpen, Shield, Flag, CalendarDays } from 'lucide-react';
 
 export default function AdminDashboard() {
-  const [stats, setStats] = useState({
-    totalUsers: 0,
-    pendingApprovals: 0,
-    totalCourses: 0,
-    totalBookings: 0,
-  });
+  const { user } = useAuthStore();
 
-  useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        const usersRes = await api.get('/users?limit=100');
-        const pending = usersRes.data.users.filter((u: any) => !u.isApproved).length;
-        setStats((s) => ({
-          ...s,
-          totalUsers: usersRes.data.pagination.total,
-          pendingApprovals: pending,
-        }));
-      } catch {}
-    };
-    fetchStats();
-  }, []);
-
-  const statCards = [
-    { label: 'Total Users', value: stats.totalUsers, icon: Users, color: 'text-blue-600 bg-blue-50' },
-    { label: 'Pending Approvals', value: stats.pendingApprovals, icon: Clock, color: 'text-yellow-600 bg-yellow-50' },
-    { label: 'Total Courses', value: stats.totalCourses, icon: BookOpen, color: 'text-green-600 bg-green-50' },
-    { label: 'Total Bookings', value: stats.totalBookings, icon: CheckCircle, color: 'text-purple-600 bg-purple-50' },
+  const cards = [
+    { href: '/admin/users',    label: 'Manage Users',    desc: 'Approve and manage accounts',  icon: Users,        color: 'bg-blue-50 text-blue-600' },
+    { href: '/admin/bookings', label: 'Bookings',        desc: 'Review and approve sessions',  icon: Calendar,     color: 'bg-green-50 text-green-600' },
+    { href: '/admin/schedule', label: 'Weekly Schedule', desc: 'View all sessions this week',  icon: CalendarDays, color: 'bg-yellow-50 text-yellow-600' },
+    { href: '/admin/audit',    label: 'Audit Logs',      desc: 'Track all system actions',     icon: Shield,       color: 'bg-purple-50 text-purple-600' },
+    { href: '/admin/features', label: 'Feature Flags',   desc: 'Toggle features per tenant',   icon: Flag,         color: 'bg-indigo-50 text-indigo-600' },
   ];
 
   return (
     <DashboardLayout title="Admin Dashboard">
-      <div className="space-y-6">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {statCards.map(({ label, value, icon: Icon, color }) => (
-            <Card key={label}>
-              <CardBody className="flex items-center gap-4">
-                <div className={`p-3 rounded-xl ${color}`}>
-                  <Icon className="w-6 h-6" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-gray-900">{value}</p>
-                  <p className="text-sm text-gray-500">{label}</p>
-                </div>
-              </CardBody>
-            </Card>
-          ))}
-        </div>
+      <h1 className="text-2xl font-bold text-gray-900 mb-1">
+        Welcome, {user?.name} 👋
+      </h1>
+      <p className="text-gray-500 mb-8">Manage your flight school from here.</p>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {cards.map((c) => {
+          const Icon = c.icon;
+          return (
+            <Link key={c.href} href={c.href}
+              className="bg-white rounded-2xl border border-gray-200 p-6 hover:border-blue-300 hover:shadow-sm transition-all">
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${c.color}`}>
+                <Icon className="w-5 h-5" />
+              </div>
+              <h2 className="font-semibold text-gray-900">{c.label}</h2>
+              <p className="text-sm text-gray-500 mt-1">{c.desc}</p>
+            </Link>
+          );
+        })}
       </div>
     </DashboardLayout>
   );

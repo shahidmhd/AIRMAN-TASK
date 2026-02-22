@@ -5,32 +5,34 @@ import { usePathname } from 'next/navigation';
 import { useAuthStore } from '@/store/auth.store';
 import { cn } from '@/lib/utils';
 import {
-    LayoutDashboard, Users, BookOpen, Calendar,
-    LogOut, GraduationCap, CalendarDays
-  } from 'lucide-react';
+  LayoutDashboard, Users, BookOpen, Calendar,
+  LogOut, GraduationCap, CalendarDays, Shield, Flag,
+} from 'lucide-react';
 
-const navItems = {
-    ADMIN: [
-      { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
-      { href: '/admin/users', label: 'Users', icon: Users },
-      { href: '/admin/bookings', label: 'Bookings', icon: Calendar },
-      { href: '/admin/schedule', label: 'Weekly Schedule', icon: CalendarDays },
-    ],
-    INSTRUCTOR: [
-      { href: '/instructor', label: 'Dashboard', icon: LayoutDashboard },
-      { href: '/instructor/courses', label: 'My Courses', icon: BookOpen },
-      { href: '/instructor/schedule', label: 'Schedule', icon: Calendar },
-    ],
-    STUDENT: [
-      { href: '/student', label: 'Dashboard', icon: LayoutDashboard },
-      { href: '/student/courses', label: 'Courses', icon: BookOpen },
-      { href: '/student/bookings', label: 'Bookings', icon: Calendar },
-    ],
-  };
+const navItems: Record<string, { href: string; label: string; icon: any }[]> = {
+  ADMIN: [
+    { href: '/admin',          label: 'Dashboard',     icon: LayoutDashboard },
+    { href: '/admin/users',    label: 'Users',         icon: Users },
+    { href: '/admin/bookings', label: 'Bookings',      icon: Calendar },
+    { href: '/admin/schedule', label: 'Schedule',      icon: CalendarDays },
+    { href: '/admin/audit',    label: 'Audit Logs',    icon: Shield },
+    { href: '/admin/features', label: 'Feature Flags', icon: Flag },
+  ],
+  INSTRUCTOR: [
+    { href: '/instructor',          label: 'Dashboard', icon: LayoutDashboard },
+    { href: '/instructor/courses',  label: 'My Courses', icon: BookOpen },
+    { href: '/instructor/schedule', label: 'Schedule',   icon: Calendar },
+  ],
+  STUDENT: [
+    { href: '/student',          label: 'Dashboard', icon: LayoutDashboard },
+    { href: '/student/courses',  label: 'Courses',   icon: BookOpen },
+    { href: '/student/bookings', label: 'Bookings',  icon: Calendar },
+  ],
+};
 
 export default function Sidebar() {
   const pathname = usePathname();
-  const { user, logout } = useAuthStore();
+  const { user, logout, tenantSlug } = useAuthStore();
 
   if (!user) return null;
 
@@ -38,11 +40,15 @@ export default function Sidebar() {
 
   const handleLogout = async () => {
     try {
-      await fetch('/api/auth/logout', { method: 'POST' });
-    } finally {
-      logout();
-      window.location.href = '/login';
-    }
+      const refreshToken = localStorage.getItem('refreshToken');
+      await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/logout`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshToken }),
+      });
+    } catch {}
+    logout();
+    window.location.href = '/login';
   };
 
   return (
@@ -53,13 +59,18 @@ export default function Sidebar() {
           <GraduationCap className="w-7 h-7 text-blue-400" />
           <span className="text-xl font-bold">AIRMAN</span>
         </div>
+        {tenantSlug && (
+          <p className="text-xs text-gray-400 mt-1 capitalize">
+            {tenantSlug.replace(/-/g, ' ')}
+          </p>
+        )}
       </div>
 
       {/* User Info */}
       <div className="px-6 py-4 border-b border-gray-700">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-full bg-blue-600 flex items-center justify-center text-sm font-bold">
-            {user.name.charAt(0).toUpperCase()}
+          <div className="w-9 h-9 rounded-full bg-blue-600 flex items-center justify-center text-sm font-bold shrink-0">
+            {user.name?.charAt(0).toUpperCase()}
           </div>
           <div className="min-w-0">
             <p className="text-sm font-medium truncate">{user.name}</p>

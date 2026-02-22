@@ -1,11 +1,11 @@
 const prisma = require('../../config/db');
 
-const createCourse = async ({ title, description, createdById }) => {
-  return prisma.course.create({
-    data: { title, description, createdById },
-    include: { modules: true },
-  });
-};
+const createCourse = async ({ title, description, createdById, tenantId }) => {
+    return prisma.course.create({
+      data: { title, description, createdById, tenantId },
+      include: { modules: true },
+    });
+  };
 
 const getAllCourses = async ({ page = 1, limit = 10, search = '' } = {}) => {
   const skip = (page - 1) * limit;

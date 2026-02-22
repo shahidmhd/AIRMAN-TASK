@@ -1,40 +1,51 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import Cookies from 'js-cookie';
-import { User } from '@/types';
+
+interface User {
+  id: string;
+  email: string;
+  name: string;
+  role: 'ADMIN' | 'INSTRUCTOR' | 'STUDENT';
+  tenantId: string;
+  isApproved: boolean;
+}
 
 interface AuthState {
   user: User | null;
-  isAuthenticated: boolean;
-  setAuth: (user: User, accessToken: string, refreshToken: string) => void;
+  accessToken: string | null;
+  refreshToken: string | null;
+  tenantSlug: string | null;
+  setAuth: (user: User, accessToken: string, refreshToken: string, tenantSlug: string) => void;
   logout: () => void;
-  updateUser: (user: User) => void;
+  isAuthenticated: () => boolean;
 }
 
 export const useAuthStore = create<AuthState>()(
   persist(
-    (set) => ({
-      user: null,
-      isAuthenticated: false,
+    (set, get) => ({
+      user:         null,
+      accessToken:  null,
+      refreshToken: null,
+      tenantSlug:   null,
 
-      setAuth: (user, accessToken, refreshToken) => {
-        Cookies.set('accessToken', accessToken, { expires: 1 });
-        Cookies.set('refreshToken', refreshToken, { expires: 7 });
-        set({ user, isAuthenticated: true });
+      setAuth: (user, accessToken, refreshToken, tenantSlug) => {
+        localStorage.setItem('accessToken',  accessToken);
+        localStorage.setItem('refreshToken', refreshToken);
+        localStorage.setItem('tenantSlug',   tenantSlug);
+        document.cookie = `accessToken=${accessToken}; path=/; max-age=900`;
+        set({ user, accessToken, refreshToken, tenantSlug });
       },
 
       logout: () => {
-        Cookies.remove('accessToken');
-        Cookies.remove('refreshToken');
-        set({ user: null, isAuthenticated: false });
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('refreshToken');
+        localStorage.removeItem('tenantSlug');
+        document.cookie = 'accessToken=; path=/; max-age=0';
+        set({ user: null, accessToken: null, refreshToken: null, tenantSlug: null });
       },
 
-      updateUser: (user) => set({ user }),
+      isAuthenticated: () => !!get().user && !!get().accessToken,
     }),
-    {
-      name: 'auth-store',
-      // Only persist user, not tokens (tokens are in cookies)
-      partialize: (state) => ({ user: state.user, isAuthenticated: state.isAuthenticated }),
-    }
+    { name: 'airman-auth' }
   )
 );

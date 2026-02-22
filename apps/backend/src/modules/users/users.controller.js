@@ -2,16 +2,19 @@ const { z } = require('zod');
 const usersService = require('./users.service');
 
 const getUsers = async (req, res, next) => {
-  try {
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 10;
-    const role = req.query.role;
-    const result = await usersService.getAllUsers({ page, limit, role });
-    res.json(result);
-  } catch (error) {
-    next(error);
-  }
-};
+    try {
+      const page  = parseInt(req.query.page)  || 1;
+      const limit = parseInt(req.query.limit) || 10;
+      const role  = req.query.role;
+      const result = await usersService.getAllUsers({
+        page, limit, role,
+        tenantId: req.tenant.id, 
+      });
+      res.json(result);
+    } catch (error) {
+      next(error);
+    }
+  };
 
 const approveUser = async (req, res, next) => {
   try {
@@ -23,34 +26,25 @@ const approveUser = async (req, res, next) => {
 };
 
 const createInstructor = async (req, res, next) => {
-  try {
-    // Log incoming body for debug
-    console.log('Creating instructor, body:', req.body);
-
-    const schema = z.object({
-      email: z.string().email('Invalid email'),
-      password: z.string().min(8, 'Password must be at least 8 characters'),
-      name: z.string().min(2, 'Name must be at least 2 characters'),
-    });
-
-    const result = schema.safeParse(req.body);
-
-    if (!result.success) {
-      return res.status(400).json({
-        error: 'Validation Error',
-        details: result.error.errors.map((e) => ({
-          field: e.path.join('.'),
-          message: e.message,
-        })),
+    try {
+      const schema = z.object({
+        email: z.string().email(),
+        password: z.string().min(8),
+        name: z.string().min(2),
       });
+      const data = schema.parse(req.body);
+  
+      // ✅ Pass tenantId from middleware
+      const instructor = await usersService.createInstructor({
+        ...data,
+        tenantId: req.tenant.id,
+      });
+  
+      res.status(201).json({ message: 'Instructor created', instructor });
+    } catch (error) {
+      next(error);
     }
-
-    const instructor = await usersService.createInstructor(result.data);
-    res.status(201).json({ message: 'Instructor created successfully', instructor });
-  } catch (error) {
-    next(error);
-  }
-};
+  };
 
 const getMe = async (req, res) => {
   res.json({ user: req.user });

@@ -17,6 +17,20 @@ services:
       timeout: 5s
       retries: 10
 
+  redis:
+    image: redis:7-alpine
+    container_name: airman_redis
+    restart: unless-stopped
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
   backend:
     build:
       context: ./apps/backend
@@ -27,6 +41,8 @@ services:
       - '4000:4000'
     environment:
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/airman_dev
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
       JWT_ACCESS_SECRET: dev-access-secret-change-in-prod
       JWT_REFRESH_SECRET: dev-refresh-secret-change-in-prod
       JWT_ACCESS_EXPIRES_IN: 15m
@@ -34,8 +50,11 @@ services:
       NODE_ENV: production
       FRONTEND_URL: http://localhost:3000
       PORT: 4000
+      ESCALATION_HOURS: 2
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     command: >
       sh -c "npx prisma migrate deploy &&
@@ -57,3 +76,4 @@ services:
 
 volumes:
   postgres_data:
+  redis_data:

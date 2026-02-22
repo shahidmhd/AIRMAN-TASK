@@ -4,18 +4,15 @@ import { useAuthStore } from '@/store/auth.store';
 import Badge from '@/components/ui/Badge';
 
 const roleBadge = {
-  ADMIN: 'red' as const,
+  ADMIN:      'red'  as const,
   INSTRUCTOR: 'blue' as const,
-  STUDENT: 'green' as const,
+  STUDENT:    'green' as const,
 };
 
-interface HeaderProps {
-  title: string;
-}
+interface HeaderProps { title: string; }
 
 export default function Header({ title }: HeaderProps) {
   const { user } = useAuthStore();
-
   return (
     <header className="bg-white border-b border-gray-200 px-6 py-4">
       <div className="flex items-center justify-between">

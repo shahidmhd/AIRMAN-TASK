@@ -20,25 +20,22 @@ const getCourse = async (req, res, next) => {
 };
 
 const createCourse = async (req, res, next) => {
-  try {
-    const schema = z.object({
-      title: z.string().min(3, 'Title must be at least 3 characters'),
-      description: z.string().optional(),
-    });
-    const result = schema.safeParse(req.body);
-    if (!result.success) {
-      return res.status(400).json({
-        error: 'Validation Error',
-        details: result.error.errors.map(e => ({ field: e.path.join('.'), message: e.message })),
+    try {
+      const schema = z.object({
+        title: z.string().min(3),
+        description: z.string().optional(),
       });
+      const data = schema.parse(req.body);
+      const course = await coursesService.createCourse({
+        ...data,
+        createdById: req.user.id,
+        tenantId: req.tenant.id,  // ✅ add this
+      });
+      res.status(201).json({ message: 'Course created', course });
+    } catch (error) {
+      next(error);
     }
-    const course = await coursesService.createCourse({
-      ...result.data,
-      createdById: req.user.id,
-    });
-    res.status(201).json(course);
-  } catch (error) { next(error); }
-};
+  };
 
 const updateCourse = async (req, res, next) => {
   try {

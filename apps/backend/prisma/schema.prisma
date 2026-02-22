@@ -7,78 +7,100 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ── Tenants ───────────────────────────────────────────────────────
+model Tenant {
+  id        String   @id @default(uuid())
+  name      String
+  slug      String   @unique
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users        User[]
+  courses      Course[]
+  bookings     Booking[]
+  availability Availability[]
+  auditLogs    AuditLog[]
+  featureFlags FeatureFlag[]
+
+  @@index([slug])
+}
+
+// ── Users ─────────────────────────────────────────────────────────
+model User {
+  id         String   @id @default(uuid())
+  email      String
+  password   String
+  name       String
+  role       Role     @default(STUDENT)
+  isApproved Boolean  @default(false)
+  tenantId   String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  tenant               Tenant         @relation(fields: [tenantId], references: [id])
+  refreshTokens        RefreshToken[]
+  courses              Course[]
+  bookingsAsStudent    Booking[]      @relation("StudentBookings")
+  bookingsAsInstructor Booking[]      @relation("InstructorBookings")
+  availability         Availability[]
+  quizAttempts         QuizAttempt[]
+  auditLogs            AuditLog[]
+
+  @@unique([email, tenantId])
+  @@index([tenantId])
+  @@index([email])
+}
+
 enum Role {
   STUDENT
   INSTRUCTOR
   ADMIN
 }
 
-enum BookingStatus {
-  REQUESTED
-  APPROVED
-  COMPLETED
-  CANCELLED
-}
-
-enum LessonType {
-  TEXT
-  QUIZ
-}
-
-model User {
-  id           String   @id @default(uuid())
-  email        String   @unique
-  password     String
-  name         String
-  role         Role     @default(STUDENT)
-  isApproved   Boolean  @default(false)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  refreshTokens RefreshToken[]
-  quizAttempts  QuizAttempt[]
-  bookingsAsStudent    Booking[] @relation("StudentBookings")
-  bookingsAsInstructor Booking[] @relation("InstructorBookings")
-  availabilities       Availability[]
-
-  @@map("users")
-}
-
+// ── Refresh Tokens ────────────────────────────────────────────────
 model RefreshToken {
   id        String   @id @default(uuid())
   token     String   @unique
   userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   expiresAt DateTime
   createdAt DateTime @default(now())
 
-  @@map("refresh_tokens")
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([token])
+  @@index([userId])
 }
 
+// ── Courses ───────────────────────────────────────────────────────
 model Course {
   id          String   @id @default(uuid())
   title       String
   description String?
+  tenantId    String
   createdById String
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  modules Module[]
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  createdBy User     @relation(fields: [createdById], references: [id])
+  modules   Module[]
 
-  @@map("courses")
+  @@index([tenantId])
+  @@index([createdById])
+  @@index([title])
 }
 
 model Module {
-  id        String   @id @default(uuid())
-  title     String
-  order     Int      @default(0)
-  courseId  String
-  course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  createdAt DateTime @default(now())
+  id       String @id @default(uuid())
+  title    String
+  order    Int    @default(0)
+  courseId String
 
+  course  Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
   lessons Lesson[]
 
-  @@map("modules")
+  @@index([courseId])
 }
 
 model Lesson {
@@ -88,75 +110,144 @@ model Lesson {
   content  String?
   order    Int        @default(0)
   moduleId String
-  module   Module     @relation(fields: [moduleId], references: [id], onDelete: Cascade)
 
-  quiz Quiz?
+  module Module @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  quiz   Quiz?
 
-  @@map("lessons")
+  @@index([moduleId])
+}
+
+enum LessonType {
+  TEXT
+  QUIZ
 }
 
 model Quiz {
   id       String @id @default(uuid())
   lessonId String @unique
-  lesson   Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
 
+  lesson    Lesson        @relation(fields: [lessonId], references: [id], onDelete: Cascade)
   questions Question[]
   attempts  QuizAttempt[]
-
-  @@map("quizzes")
 }
 
 model Question {
   id      String   @id @default(uuid())
   text    String
-  options Json
+  options String[]
   answer  String
   quizId  String
-  quiz    Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
 
-  @@map("questions")
+  quiz Quiz @relation(fields: [quizId], references: [id], onDelete: Cascade)
+
+  @@index([quizId])
 }
 
 model QuizAttempt {
   id        String   @id @default(uuid())
   userId    String
-  user      User     @relation(fields: [userId], references: [id])
   quizId    String
-  quiz      Quiz     @relation(fields: [quizId], references: [id])
   score     Int
   total     Int
   answers   Json
   results   Json
   createdAt DateTime @default(now())
 
-  @@map("quiz_attempts")
+  user User @relation(fields: [userId], references: [id])
+  quiz Quiz @relation(fields: [quizId], references: [id])
+
+  @@index([userId])
+  @@index([quizId])
 }
 
+// ── Scheduling ────────────────────────────────────────────────────
 model Availability {
   id           String   @id @default(uuid())
   instructorId String
-  instructor   User     @relation(fields: [instructorId], references: [id])
-  date         DateTime @db.Date
+  tenantId     String
+  date         DateTime
   startTime    String
   endTime      String
   createdAt    DateTime @default(now())
 
-  @@map("availabilities")
+  instructor User   @relation(fields: [instructorId], references: [id])
+  tenant     Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([instructorId])
+  @@index([tenantId])
+  @@index([date])
 }
 
 model Booking {
   id           String        @id @default(uuid())
   studentId    String
-  student      User          @relation("StudentBookings", fields: [studentId], references: [id])
   instructorId String
-  instructor   User          @relation("InstructorBookings", fields: [instructorId], references: [id])
-  date         DateTime      @db.Date
+  tenantId     String
+  date         DateTime
   startTime    String
   endTime      String
   status       BookingStatus @default(REQUESTED)
   notes        String?
+  assignedAt   DateTime?
+  escalatedAt  DateTime?
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
 
-  @@map("bookings")
+  student    User   @relation("StudentBookings",    fields: [studentId],    references: [id])
+  instructor User   @relation("InstructorBookings", fields: [instructorId], references: [id])
+  tenant     Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
+  @@index([instructorId])
+  @@index([date])
+  @@index([status])
+}
+
+enum BookingStatus {
+  REQUESTED
+  APPROVED
+  ASSIGNED
+  COMPLETED
+  CANCELLED
+}
+
+// ── Audit Logs ────────────────────────────────────────────────────
+model AuditLog {
+  id            String   @id @default(uuid())
+  userId        String?
+  tenantId      String
+  action        String
+  entity        String
+  entityId      String?
+  before        Json?
+  after         Json?
+  correlationId String
+  ipAddress     String?
+  userAgent     String?
+  createdAt     DateTime @default(now())
+
+  user   User?  @relation(fields: [userId],   references: [id])
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
+  @@index([userId])
+  @@index([action])
+  @@index([correlationId])
+  @@index([createdAt])
+}
+
+// ── Feature Flags ─────────────────────────────────────────────────
+model FeatureFlag {
+  id        String   @id @default(uuid())
+  tenantId  String
+  key       String
+  enabled   Boolean  @default(false)
+  roles     Role[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, key])
+  @@index([tenantId])
 }

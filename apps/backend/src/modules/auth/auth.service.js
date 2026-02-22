@@ -3,56 +3,44 @@ const jwt = require('jsonwebtoken');
 const prisma = require('../../config/db');
 const env = require('../../config/env');
 
-const generateAccessToken = (userId, role) => {
-  return jwt.sign({ userId, role }, env.jwt.accessSecret, {
-    expiresIn: env.jwt.accessExpiresIn,
+const generateAccessToken = (userId, role, tenantId) => {
+  return jwt.sign({ userId, role, tenantId }, env.JWT_ACCESS_SECRET, {
+    expiresIn: env.JWT_ACCESS_EXPIRES_IN,
   });
 };
 
 const generateRefreshToken = (userId) => {
-  return jwt.sign({ userId }, env.jwt.refreshSecret, {
-    expiresIn: env.jwt.refreshExpiresIn,
+  return jwt.sign({ userId }, env.JWT_REFRESH_SECRET, {
+    expiresIn: env.JWT_REFRESH_EXPIRES_IN,
   });
 };
 
-const register = async ({ email, password, name, role }) => {
-  // Only allow STUDENT and INSTRUCTOR to self-register
-  const allowedRoles = ['STUDENT', 'INSTRUCTOR'];
-  const userRole = allowedRoles.includes(role) ? role : 'STUDENT';
-
-  const existing = await prisma.user.findUnique({ where: { email } });
+const register = async ({ email, password, name, role, tenantId }) => {
+  const existing = await prisma.user.findFirst({
+    where: { email, tenantId },
+  });
   if (existing) {
-    const error = new Error('Email already in use');
+    const error = new Error('User already exists');
     error.status = 409;
     throw error;
   }
 
   const hashedPassword = await bcrypt.hash(password, 12);
 
+  const isApproved = role === 'STUDENT' ? true : false;
+
   const user = await prisma.user.create({
-    data: {
-      email,
-      password: hashedPassword,
-      name,
-      role: userRole,
-      // Instructors need admin approval, students auto-approved
-      isApproved: userRole === 'STUDENT',
-    },
-    select: {
-      id: true,
-      email: true,
-      name: true,
-      role: true,
-      isApproved: true,
-      createdAt: true,
-    },
+    data: { email, password: hashedPassword, name, role: role || 'STUDENT', isApproved, tenantId },
+    select: { id: true, email: true, name: true, role: true, isApproved: true, tenantId: true },
   });
 
   return user;
 };
 
-const login = async ({ email, password }) => {
-  const user = await prisma.user.findUnique({ where: { email } });
+const login = async ({ email, password, tenantId }) => {
+  const user = await prisma.user.findFirst({
+    where: tenantId ? { email, tenantId } : { email },
+  });
 
   if (!user) {
     const error = new Error('Invalid credentials');
@@ -60,8 +48,8 @@ const login = async ({ email, password }) => {
     throw error;
   }
 
-  const isPasswordValid = await bcrypt.compare(password, user.password);
-  if (!isPasswordValid) {
+  const valid = await bcrypt.compare(password, user.password);
+  if (!valid) {
     const error = new Error('Invalid credentials');
     error.status = 401;
     throw error;
@@ -73,75 +61,54 @@ const login = async ({ email, password }) => {
     throw error;
   }
 
-  const accessToken = generateAccessToken(user.id, user.role);
+  const accessToken  = generateAccessToken(user.id, user.role, user.tenantId);
   const refreshToken = generateRefreshToken(user.id);
 
-  // Store refresh token in DB
+  // Store refresh token
   const expiresAt = new Date();
   expiresAt.setDate(expiresAt.getDate() + 7);
-
   await prisma.refreshToken.create({
-    data: {
-      token: refreshToken,
-      userId: user.id,
-      expiresAt,
-    },
+    data: { token: refreshToken, userId: user.id, expiresAt },
   });
 
   return {
+    user: { id: user.id, email: user.email, name: user.name, role: user.role, tenantId: user.tenantId },
     accessToken,
     refreshToken,
-    user: {
-      id: user.id,
-      email: user.email,
-      name: user.name,
-      role: user.role,
-    },
   };
 };
 
 const refreshTokens = async (refreshToken) => {
-  if (!refreshToken) {
-    const error = new Error('Refresh token required');
-    error.status = 401;
-    throw error;
-  }
+  const decoded = jwt.verify(refreshToken, env.JWT_REFRESH_SECRET);
 
-  let decoded;
-  try {
-    decoded = jwt.verify(refreshToken, env.jwt.refreshSecret);
-  } catch {
+  const stored = await prisma.refreshToken.findUnique({ where: { token: refreshToken } });
+  if (!stored || stored.expiresAt < new Date()) {
     const error = new Error('Invalid refresh token');
     error.status = 401;
     throw error;
   }
 
-  const storedToken = await prisma.refreshToken.findUnique({
-    where: { token: refreshToken },
-    include: { user: true },
+  const user = await prisma.user.findUnique({
+    where: { id: decoded.userId },
+    select: { id: true, email: true, name: true, role: true, tenantId: true },
   });
 
-  if (!storedToken || storedToken.expiresAt < new Date()) {
-    const error = new Error('Refresh token expired or not found');
+  if (!user) {
+    const error = new Error('User not found');
     error.status = 401;
     throw error;
   }
 
-  // Rotate refresh token (delete old, create new)
+  // Rotate refresh token
   await prisma.refreshToken.delete({ where: { token: refreshToken } });
 
-  const newAccessToken = generateAccessToken(storedToken.user.id, storedToken.user.role);
-  const newRefreshToken = generateRefreshToken(storedToken.user.id);
+  const newAccessToken  = generateAccessToken(user.id, user.role, user.tenantId);
+  const newRefreshToken = generateRefreshToken(user.id);
 
   const expiresAt = new Date();
   expiresAt.setDate(expiresAt.getDate() + 7);
-
   await prisma.refreshToken.create({
-    data: {
-      token: newRefreshToken,
-      userId: storedToken.user.id,
-      expiresAt,
-    },
+    data: { token: newRefreshToken, userId: user.id, expiresAt },
   });
 
   return { accessToken: newAccessToken, refreshToken: newRefreshToken };
@@ -149,8 +116,8 @@ const refreshTokens = async (refreshToken) => {
 
 const logout = async (refreshToken) => {
   if (refreshToken) {
-    await prisma.refreshToken.deleteMany({ where: { token: refreshToken } });
+    await prisma.refreshToken.deleteMany({ where: { token: refreshToken } }).catch(() => {});
   }
 };
 
-module.exports = { register, login, refreshTokens, logout, generateAccessToken, generateRefreshToken };
+module.exports = { register, login, refreshTokens, logout };

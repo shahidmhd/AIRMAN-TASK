@@ -3,7 +3,8 @@ const router = express.Router();
 const ctrl = require('./courses.controller');
 const { authenticate } = require('../../middleware/auth.middleware');
 const { requireInstructor, requireStudent } = require('../../middleware/rbac.middleware');
-
+const { tenantMiddleware } = require('../../middleware/tenant.middleware');
+router.use(tenantMiddleware);
 // ── Lessons FIRST (before /:id to avoid conflicts) ───────────────
 router.post('/modules/:moduleId/lessons', authenticate, requireInstructor, ctrl.createLesson);
 router.put('/modules/:moduleId/lessons/:lessonId', authenticate, requireInstructor, ctrl.updateLesson);

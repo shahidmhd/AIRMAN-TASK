@@ -8,7 +8,7 @@ interface AlertProps {
 
 const config = {
   success: { icon: CheckCircle, class: 'bg-green-50 border-green-200 text-green-800' },
-  error: { icon: XCircle, class: 'bg-red-50 border-red-200 text-red-800' },
+  error:   { icon: XCircle,     class: 'bg-red-50 border-red-200 text-red-800' },
   warning: { icon: AlertCircle, class: 'bg-yellow-50 border-yellow-200 text-yellow-800' },
 };
 
